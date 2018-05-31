@@ -2,9 +2,9 @@
   "name": "music-app-api",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "sever.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "nodemon server.js"
   },
   "repository": {
     "type": "git",
@@ -17,9 +17,14 @@
   },
   "homepage": "https://github.com/simeonplatonov/Music-App-API#readme",
   "dependencies": {
+    "bcrypt-nodejs": "0.0.3",
     "body-parser": "^1.18.3",
     "cors": "^2.8.4",
     "express": "^4.16.3",
-    "nodemon": "^1.17.5"
+    "express-fileupload": "^0.4.0",
+    "knex": "0.14.6",
+    "multer": "^1.3.0",
+    "nodemon": "^1.17.5",
+    "pg": "^7.4.3"
   }
 }
