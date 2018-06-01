@@ -4,6 +4,9 @@ const bodyParser = require("body-parser");
 const app = express();
 const knex = require('knex');
 const bcrypt = require("bcrypt-nodejs");
+const request = require("request");
+const formidable = require("express-formidable");
+const upload = require("express-fileupload");
 const db = knex({
   client: 'pg',
 
@@ -15,14 +18,16 @@ const db = knex({
   },
 
 });
-const upload = require("express-fileupload");
+
 const fs = require('fs');
 
 app.use(cors());
 
 app.use(bodyParser.json());
 
-app.use(upload());
+app.use(upload({
+  abortOnLimit:false,
+}));
 
 app.get("/",(req,res)=>res.send("<h1>Hello World!</h1>"));
 
@@ -54,7 +59,7 @@ app.post("/login",(req,res)=>{
           const isValid=bcrypt.compareSync(password, loginInfo[0].password);
           if(isValid){
             db("users").where({email:loginInfo[0].email}).select("*").then(response=>{
-              res.json(response);
+              res.json(response[0]);
             });
 
 
@@ -76,7 +81,9 @@ app.post('/upload', function(req, res) {
 
   let fileName = req.body.title+"-"+Date.now();
   const path = `${__dirname}/uploads/${fileName}.wav`;
+  const partialPath = `uploads/${fileName}.wav`;
   // Use the mv() method to place the file somewhere on your server
+  console.log(req.files);
   song.mv(path, function(err) {
     if (err){
       return res.status(500).send(err);
@@ -84,12 +91,12 @@ app.post('/upload', function(req, res) {
       db.transaction(trx=>{
         trx("songs").insert({
         song_name:req.body.title,
-        song_path:path,
+        song_path:partialPath,
         artist:req.body.username
         }).then(trx.commit).catch(trx.rollback)
       })
-      .catch(err=>res.status(400).json("Unable to upload"));
-      res.send('File uploaded!');
+      .catch(err=>res.status(400).json("Unable to upload")).then(res.redirect("http://localhost:3001/"));
+
     }
 
 
@@ -100,6 +107,42 @@ app.get("/show",(req,res)=>{
 
   db("songs").select("*").then(songs=>res.json(songs));
 });
+app.get("/stream",(req,res)=>{
+  const path = req.query.path;
+
+  console.log(req);
+ const stat = fs.statSync(path)
+ const fileSize = stat.size
+ const range = req.headers.range
+
+ if (range) {
+   const parts = range.replace(/bytes=/, "").split("-")
+   const start = parseInt(parts[0], 10)
+   const end = parts[1]
+     ? parseInt(parts[1], 10)
+     : fileSize-1
+   const chunksize = (end-start)+1
+   const file = fs.createReadStream(path, {start, end})
+   const head = {
+     'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+     'Accept-Ranges': 'bytes',
+     'Content-Length': chunksize,
+     'Content-Type': 'audio/wav',
+   }
+
+   res.writeHead(206, head);
+   file.pipe(res);
+ } else {
+   const head = {
+     'Content-Length': fileSize,
+     'Content-Type': 'audio/wav',
+   }
+   res.writeHead(200, head)
+   fs.createReadStream(path).pipe(res)
+ }
+
+});
+
 
 app.get("/search/:keyword",(req,res)=>{
   const {keyword} = req.params;
